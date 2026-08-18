@@ -1,4 +1,4 @@
-name = "snapfetch-cdn-proxy"
+name = "onlinemp4-cdn-proxy"
 main = "cdn-proxy.js"
 compatibility_date = "2025-01-01"
 

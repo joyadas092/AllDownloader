@@ -1,5 +1,5 @@
 /**
- * SnapFetch edge download proxy (Cloudflare Worker).
+ * OnlineMP4 edge download proxy (Cloudflare Worker).
  *
  * Purpose: keep video bytes off the application host. The Next.js app mints a
  * short-lived HMAC token describing one CDN URL and one filename; this Worker
