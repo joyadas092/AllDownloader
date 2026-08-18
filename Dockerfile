@@ -38,6 +38,25 @@ ENV SITE_URL=$SITE_URL \
 
 RUN npm run build
 
+# ---- PO token provider ----
+#
+# YouTube withholds its DASH formats from clients that cannot present a
+# proof-of-origin token, serving the first ~10-20 MB and then returning 403.
+# This builds the provider that mints one per video; the yt-dlp plugin installed
+# in the runtime stage talks to it over loopback.
+#
+# Pinned to match the plugin version below -- the two speak a shared protocol
+# and are released together, so they must be bumped together.
+FROM node:22-slim AS potserver
+ARG BGUTIL_VERSION=1.3.1
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 --single-branch --branch "${BGUTIL_VERSION}" \
+        https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /pot
+WORKDIR /pot/server
+RUN npm ci && npx tsc && npm prune --omit=dev
+
 # ---- runtime ----
 FROM node:22-slim AS runtime
 WORKDIR /app
@@ -58,10 +77,20 @@ ARG YTDLP_VERSION=2026.7.4
 # the solver for YouTube's "n challenge". Without it YouTube hands back only
 # thumbnails -- every media format is withheld, and yt-dlp reports the confusing
 # "Requested format is not available" rather than anything about a challenge.
+ARG BGUTIL_VERSION=1.3.1
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl \
-    && pip3 install --no-cache-dir --break-system-packages "yt-dlp[default]==${YTDLP_VERSION}" \
+    && pip3 install --no-cache-dir --break-system-packages \
+        "yt-dlp[default]==${YTDLP_VERSION}" \
+        "bgutil-ytdlp-pot-provider==${BGUTIL_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
+
+# The provider server itself, plus the entrypoint that launches it. yt-dlp
+# discovers the plugin automatically and defaults to 127.0.0.1:4416, so no
+# extractor-args are needed as long as the server is listening there.
+COPY --from=potserver /pot/server /opt/pot
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Solving that challenge also needs a JavaScript runtime. yt-dlp defaults to
 # Deno, but this image already ships Node -- hence node:22-slim rather than 20,
@@ -78,4 +107,4 @@ RUN mkdir -p /app/tmp-downloads
 
 # `next start` honours PORT, which Railway sets for you.
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["/usr/local/bin/docker-entrypoint.sh"]
