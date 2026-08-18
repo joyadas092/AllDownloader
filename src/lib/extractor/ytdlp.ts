@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 
 import { env } from "@/lib/env";
+import { detectPlatform } from "@/lib/platforms";
+import { resolveCookiesFile } from "./cookies";
 import { getTempDir } from "./jobs";
 import { buildDirectDownloadUrl, safeFilename } from "./sign";
 import { ExtractError, type FormatOption, type VideoInfo } from "./types";
@@ -265,6 +267,23 @@ function logYtDlpFailure(context: string, stderr: string): void {
 
 function mapYtDlpError(stderr: string): ExtractError {
   const lower = stderr.toLowerCase();
+
+  // YouTube's bot check. Reached either because no cookie jar is configured or
+  // because the one we have has expired — both are operator problems, and both
+  // previously surfaced as a generic "extraction_error" that took a log dive to
+  // identify. The distinct prefix below is the thing to grep for.
+  if (lower.includes("sign in to confirm") || lower.includes("not a bot")) {
+    console.error(
+      `[yt-dlp] cookies rejected: YouTube bot check hit — ${
+        resolveCookiesFile() ? "the configured cookie jar is stale" : "no cookie jar is configured"
+      }`
+    );
+    return new ExtractError(
+      "auth_required",
+      "YouTube is asking us to verify this request. We're on it — try another platform meanwhile."
+    );
+  }
+
   if (lower.includes("private video") || lower.includes("login required")) {
     return new ExtractError("private_video", "This video is private or requires login to view.");
   }
@@ -293,14 +312,25 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Only YouTube bot-checks us, so only YouTube gets handed the cookie jar. */
+function needsCookies(url: string): boolean {
+  const platform = detectPlatform(url);
+  return platform.supported && platform.id === "youtube";
+}
+
 /**
  * Flags applied to every yt-dlp invocation. Kept in one place so the extract
  * and download paths cannot drift apart — a bypass that only works on extract
  * produces a format list you then cannot download.
+ *
+ * The cookie jar is attached per-URL rather than globally. yt-dlp's cookiejar
+ * is domain-scoped so this isn't plugging a leak, but it keeps a live Google
+ * credential out of unrelated extractions and stops them rewriting the jar.
  */
-function commonArgs(): string[] {
+function commonArgs(url: string): string[] {
   const args = [...env.ytDlpExtraArgs];
-  if (env.ytDlpCookiesFile) args.push("--cookies", env.ytDlpCookiesFile);
+  const jar = needsCookies(url) ? resolveCookiesFile() : null;
+  if (jar) args.push("--cookies", jar);
   return args;
 }
 
@@ -311,7 +341,7 @@ async function runYtDlpJson(url: string): Promise<string> {
     try {
       const result = await execFileAsync(
         env.ytDlpPath,
-        ["-j", "--no-warnings", "--no-playlist", "--socket-timeout", "20", ...commonArgs(), url],
+        ["-j", "--no-warnings", "--no-playlist", "--socket-timeout", "20", ...commonArgs(url), url],
         { timeout: env.processTimeoutMs, maxBuffer: 1024 * 1024 * 32 }
       );
       return result.stdout;
@@ -399,7 +429,7 @@ export function downloadFormat(
       env.maxDownloadSize,
       "--socket-timeout",
       "20",
-      ...commonArgs(),
+      ...commonArgs(url),
     ];
 
     if (isAudio) {

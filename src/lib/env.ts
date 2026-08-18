@@ -100,8 +100,17 @@ export const env = {
    */
   ytDlpExtraArgs: (process.env.YTDLP_EXTRA_ARGS || "").split(/\s+/).filter(Boolean),
 
-  /** Path to a Netscape-format cookies file, if one is supplied. */
+  /** Path to a Netscape-format cookies file, if one is supplied. Local dev. */
   ytDlpCookiesFile: process.env.YTDLP_COOKIES_FILE || "",
+
+  /**
+   * The same cookie jar, base64-encoded, for hosts where you cannot put a file
+   * on disk. Railway has no persistent volume and no file upload, so a path
+   * alone can never be satisfied there — this is how YouTube authentication
+   * actually reaches production. Decoded lazily in extractor/cookies.ts; kept
+   * out of this module so env.ts stays free of filesystem work.
+   */
+  ytDlpCookiesB64: process.env.YTDLP_COOKIES_B64 || "",
 };
 
 /** Parses a yt-dlp style size string ("500M", "2G", "700") into megabytes. */

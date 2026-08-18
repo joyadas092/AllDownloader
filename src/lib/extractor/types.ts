@@ -4,6 +4,8 @@ export type ExtractErrorCode =
   | "private_video"
   | "source_unavailable"
   | "rate_limited"
+  /** The source is demanding sign-in from us, not from the visitor. */
+  | "auth_required"
   | "extraction_error"
   | "server_error";
 
