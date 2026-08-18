@@ -43,3 +43,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scratch output from manual API probing
+/direct.txt
+/prod.json
+/*.bin
