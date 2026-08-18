@@ -1,0 +1,7 @@
+name = "snapfetch-cdn-proxy"
+main = "cdn-proxy.js"
+compatibility_date = "2025-01-01"
+
+# DOWNLOAD_SIGNING_SECRET is a secret, not a var — set it with:
+#   wrangler secret put DOWNLOAD_SIGNING_SECRET
+# It must match DOWNLOAD_SIGNING_SECRET in the Next.js app's environment.
