@@ -44,9 +44,19 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # ffmpeg (merging/audio extraction) + python3/pip (to install yt-dlp)
+#
+# yt-dlp is pinned deliberately. Unpinned, the version is whatever was current
+# when the image last built, which then sits frozen while the platforms it
+# tracks keep changing -- YouTube shipped the `iamf` audio codec and the stale
+# build could no longer resolve formats at all. Pinning makes the version
+# visible and updating it a decision rather than a side effect of rebuilding.
+#
+# Bump this regularly; yt-dlp ships fixes roughly weekly and a downloader that
+# does not follow it degrades quietly.
+ARG YTDLP_VERSION=2026.7.4
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl \
-    && pip3 install --no-cache-dir --break-system-packages yt-dlp \
+    && pip3 install --no-cache-dir --break-system-packages "yt-dlp==${YTDLP_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/public ./public
