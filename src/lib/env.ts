@@ -84,6 +84,24 @@ export const env = {
   directLinkTtlSeconds: num("DIRECT_LINK_TTL", 900),
 
   ytDlpPath: str("YTDLP_PATH", "yt-dlp"),
+
+  /**
+   * Extra yt-dlp flags, whitespace-separated, read at request time.
+   *
+   * Exists because YouTube bot-checks datacenter IPs ("Sign in to confirm
+   * you're not a bot"), and the workaround — which player client to imitate —
+   * changes as YouTube pushes back. Keeping it in the environment means trying
+   * a new value is a restart rather than a rebuild.
+   *
+   * Example: --extractor-args youtube:player_client=tv_simply,web_safari
+   *
+   * Arguments are passed to execFile as a list, never through a shell, so
+   * there is no injection path here — but it is still operator-only config.
+   */
+  ytDlpExtraArgs: (process.env.YTDLP_EXTRA_ARGS || "").split(/\s+/).filter(Boolean),
+
+  /** Path to a Netscape-format cookies file, if one is supplied. */
+  ytDlpCookiesFile: process.env.YTDLP_COOKIES_FILE || "",
 };
 
 /** Parses a yt-dlp style size string ("500M", "2G", "700") into megabytes. */

@@ -293,6 +293,17 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Flags applied to every yt-dlp invocation. Kept in one place so the extract
+ * and download paths cannot drift apart — a bypass that only works on extract
+ * produces a format list you then cannot download.
+ */
+function commonArgs(): string[] {
+  const args = [...env.ytDlpExtraArgs];
+  if (env.ytDlpCookiesFile) args.push("--cookies", env.ytDlpCookiesFile);
+  return args;
+}
+
 async function runYtDlpJson(url: string): Promise<string> {
   const MAX_ATTEMPTS = 3;
 
@@ -300,7 +311,7 @@ async function runYtDlpJson(url: string): Promise<string> {
     try {
       const result = await execFileAsync(
         env.ytDlpPath,
-        ["-j", "--no-warnings", "--no-playlist", "--socket-timeout", "20", url],
+        ["-j", "--no-warnings", "--no-playlist", "--socket-timeout", "20", ...commonArgs(), url],
         { timeout: env.processTimeoutMs, maxBuffer: 1024 * 1024 * 32 }
       );
       return result.stdout;
@@ -388,6 +399,7 @@ export function downloadFormat(
       env.maxDownloadSize,
       "--socket-timeout",
       "20",
+      ...commonArgs(),
     ];
 
     if (isAudio) {
