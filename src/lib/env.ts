@@ -111,6 +111,19 @@ export const env = {
    * out of this module so env.ts stays free of filesystem work.
    */
   ytDlpCookiesB64: process.env.YTDLP_COOKIES_B64 || "",
+
+  /**
+   * JavaScript runtime yt-dlp uses to solve YouTube's "n challenge" — one of
+   * node, deno, quickjs, bun. Empty leaves yt-dlp on its own default (deno).
+   *
+   * Unsolved, the challenge means YouTube returns only thumbnails and yt-dlp
+   * reports "Requested format is not available", which reads like a bad format
+   * string rather than a missing runtime. Node needs to be >= 22.
+   *
+   * Env-driven rather than hardcoded so a dev box on an older Node isn't forced
+   * onto a runtime it cannot satisfy — the Docker image sets it, local does not.
+   */
+  ytDlpJsRuntime: process.env.YTDLP_JS_RUNTIME || "",
 };
 
 /** Parses a yt-dlp style size string ("500M", "2G", "700") into megabytes. */

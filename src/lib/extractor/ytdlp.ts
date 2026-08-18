@@ -284,6 +284,23 @@ function mapYtDlpError(stderr: string): ExtractError {
     );
   }
 
+  // YouTube withholds every media format until its "n challenge" is solved,
+  // leaving only thumbnails. yt-dlp then reports a missing format, which points
+  // at the format string instead of at the real cause: no JS runtime, or no
+  // yt-dlp-ejs solver scripts. Name it explicitly so the next occurrence is a
+  // one-line diagnosis rather than a reproduction session.
+  if (lower.includes("n challenge solving failed") || lower.includes("only images are available")) {
+    console.error(
+      "[yt-dlp] challenge unsolved: YouTube withheld media formats — check that yt-dlp was " +
+        `installed as yt-dlp[default] and that YTDLP_JS_RUNTIME (${env.ytDlpJsRuntime || "unset"}) ` +
+        "names a runtime present in the image (Node must be >= 22)"
+    );
+    return new ExtractError(
+      "extraction_error",
+      "YouTube changed something on their end. We're working on it — try another platform meanwhile."
+    );
+  }
+
   if (lower.includes("private video") || lower.includes("login required")) {
     return new ExtractError("private_video", "This video is private or requires login to view.");
   }
@@ -312,8 +329,11 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Only YouTube bot-checks us, so only YouTube gets handed the cookie jar. */
-function needsCookies(url: string): boolean {
+/**
+ * YouTube is the only source that both bot-checks us and challenges us, so it
+ * is the only one that gets the cookie jar and the JS runtime.
+ */
+function isYouTube(url: string): boolean {
   const platform = detectPlatform(url);
   return platform.supported && platform.id === "youtube";
 }
@@ -329,8 +349,13 @@ function needsCookies(url: string): boolean {
  */
 function commonArgs(url: string): string[] {
   const args = [...env.ytDlpExtraArgs];
-  const jar = needsCookies(url) ? resolveCookiesFile() : null;
-  if (jar) args.push("--cookies", jar);
+
+  if (isYouTube(url)) {
+    const jar = resolveCookiesFile();
+    if (jar) args.push("--cookies", jar);
+    if (env.ytDlpJsRuntime) args.push("--js-runtimes", env.ytDlpJsRuntime);
+  }
+
   return args;
 }
 
