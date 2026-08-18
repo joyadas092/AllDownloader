@@ -149,10 +149,12 @@ export default function AdSlot({ name, className = "" }: { name: AdSlotName; cla
           title={spec.label}
           width={active.width}
           height={active.height}
-          // No allow-same-origin: the ad runs with an opaque origin and cannot
-          // reach into the page around it. Drop this attribute if a network
-          // needs same-origin storage and fill suffers.
-          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms"
+          // Deliberately not sandboxed. A sandbox without allow-same-origin
+          // gives the frame an opaque origin, which strips the referrer and
+          // blocks storage — Adsterra then cannot match the request to an
+          // approved domain and returns no fill, which is exactly the blank
+          // banner this component first shipped with. Ad networks need to see
+          // the host page's origin; that is the trade for showing ads at all.
           srcDoc={buildSrcDoc(active as Required<Placement>)}
           style={{ border: 0, display: "block", maxWidth: "100%" }}
         />
