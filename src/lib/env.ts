@@ -30,9 +30,29 @@ function signingSecret(): string {
 
 const maxFileSizeMb = num("MAX_FILE_SIZE_MB", 0);
 
+/**
+ * Canonical site origin.
+ *
+ * Hosting dashboards hand you a bare hostname, and pasting that in is easy to
+ * do — but `new URL()` rejects it, which takes down `metadataBase`, sitemap.xml
+ * and robots.txt, i.e. the whole site. Assume https when no scheme is given
+ * rather than crashing over a missing eight characters.
+ */
+function siteUrl(): string {
+  const raw = (process.env.SITE_URL || "http://localhost:3000").trim().replace(/\/+$/, "");
+  const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+
+  try {
+    return new URL(withScheme).origin;
+  } catch {
+    console.warn(`[env] SITE_URL is not a usable URL (${raw}); falling back to localhost.`);
+    return "http://localhost:3000";
+  }
+}
+
 export const env = {
   brandName: process.env.BRAND_NAME || "OnlineMP4",
-  siteUrl: (process.env.SITE_URL || "http://localhost:3000").replace(/\/$/, ""),
+  siteUrl: siteUrl(),
   contactEmail: process.env.CONTACT_EMAIL || "support@example.com",
 
   // --- server-side download limits -----------------------------------------
