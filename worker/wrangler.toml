@@ -5,3 +5,10 @@ compatibility_date = "2025-01-01"
 # DOWNLOAD_SIGNING_SECRET is a secret, not a var — set it with:
 #   wrangler secret put DOWNLOAD_SIGNING_SECRET
 # It must match DOWNLOAD_SIGNING_SECRET in the Next.js app's environment.
+
+[vars]
+# Where to send a download this Worker cannot fetch itself. YouTube binds its
+# CDN URLs to the IP that requested them, so the app host can serve what the
+# edge cannot; redirecting there costs host bandwidth but keeps the download
+# working. Leave unset to return an error instead.
+ORIGIN_URL = "https://onlinemp4.com"

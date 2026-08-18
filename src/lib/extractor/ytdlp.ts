@@ -240,6 +240,13 @@ async function resolveDirectLinks(formats: BuiltFormat[]): Promise<FormatOption[
       const { candidate, ...option } = format;
       if (!candidate) return option;
 
+      // Probing the raw CDN URL asks "can this host fetch it", which is not the
+      // same question as "can the edge fetch it" -- YouTube binds its URLs to
+      // the IP that requested them, so the edge gets a 403 on a URL that passes
+      // here. That gap is closed in the Worker, which redirects what it cannot
+      // fetch back to this host rather than dead-ending. Probing from here is
+      // therefore still the right check: it establishes that *someone* in the
+      // delivery chain can serve the file.
       if (await isDirectlyFetchable(candidate.url)) {
         return { ...option, direct_url: buildDirectDownloadUrl(candidate.url, candidate.filename) };
       }

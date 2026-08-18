@@ -97,6 +97,17 @@ const worker = {
     });
 
     if (!upstream.ok && upstream.status !== 206) {
+      // Some CDNs -- YouTube's in particular -- bind a URL to the IP that
+      // requested it, so the app host can fetch it and this Worker cannot. The
+      // app checks before offering a link, but the answer can change between
+      // that check and the visitor's click, and a dead end here reads as a
+      // broken download. Hand it back to the origin, which holds the session
+      // the URL was issued to. Costs host bandwidth; beats failing.
+      if (env.ORIGIN_URL) {
+        const fallback = new URL("/api/download/stream", env.ORIGIN_URL);
+        fallback.searchParams.set("t", token);
+        return Response.redirect(fallback.toString(), 302);
+      }
       return new Response("The source refused this download.", { status: 502 });
     }
 
