@@ -1,0 +1,24 @@
+# Keep the build context small, and never let host artefacts overwrite what the
+# deps/build stages produce inside the image.
+node_modules
+.next
+out
+tmp-downloads
+
+.git
+.gitignore
+
+# Real secrets never enter the image; values come from the platform's
+# environment at build and run time.
+.env
+.env.*
+!.env.example
+
+npm-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+next-env.d.ts
+
+Dockerfile
+.dockerignore
+README.md

@@ -9,6 +9,33 @@ FROM node:20-slim AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Next.js resolves these at BUILD time, not at run time:
+#   SITE_URL      -> metadataBase, every canonical URL, sitemap.xml, robots.txt
+#   BRAND_NAME    -> titles, schema, manifest
+#   NEXT_PUBLIC_* -> inlined into the client bundle
+#
+# Setting them only as runtime variables is not enough — the static pages would
+# ship with localhost canonicals and no ad keys. On Railway, declare these as
+# service variables; Railway forwards them to declared build args automatically.
+ARG SITE_URL
+ARG BRAND_NAME
+ARG CONTACT_EMAIL
+ARG NEXT_PUBLIC_ADSTERRA_TOP
+ARG NEXT_PUBLIC_ADSTERRA_AFTER_DOWNLOADER
+ARG NEXT_PUBLIC_ADSTERRA_MIDDLE
+ARG NEXT_PUBLIC_ADSTERRA_BOTTOM
+ARG NEXT_PUBLIC_ADSTERRA_SIDEBAR
+
+ENV SITE_URL=$SITE_URL \
+    BRAND_NAME=$BRAND_NAME \
+    CONTACT_EMAIL=$CONTACT_EMAIL \
+    NEXT_PUBLIC_ADSTERRA_TOP=$NEXT_PUBLIC_ADSTERRA_TOP \
+    NEXT_PUBLIC_ADSTERRA_AFTER_DOWNLOADER=$NEXT_PUBLIC_ADSTERRA_AFTER_DOWNLOADER \
+    NEXT_PUBLIC_ADSTERRA_MIDDLE=$NEXT_PUBLIC_ADSTERRA_MIDDLE \
+    NEXT_PUBLIC_ADSTERRA_BOTTOM=$NEXT_PUBLIC_ADSTERRA_BOTTOM \
+    NEXT_PUBLIC_ADSTERRA_SIDEBAR=$NEXT_PUBLIC_ADSTERRA_SIDEBAR
+
 RUN npm run build
 
 # ---- runtime ----
@@ -29,5 +56,6 @@ COPY --from=build /app/package.json ./package.json
 
 RUN mkdir -p /app/tmp-downloads
 
+# `next start` honours PORT, which Railway sets for you.
 EXPOSE 3000
 CMD ["npm", "start"]
