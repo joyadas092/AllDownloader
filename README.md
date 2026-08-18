@@ -145,6 +145,30 @@ This bakes FFmpeg and yt-dlp into the image, builds the Next.js app, and runs it
   either use sticky sessions (so a job's progress/file requests hit the same instance that started
   it) or move file storage to shared/object storage.
 
+## Deploying to Railway
+
+`railway.json` pins the Dockerfile builder and a single replica. Both matter: Railway's
+auto-detection builds a Node-only image that deploys fine and then fails every download, because
+yt-dlp and ffmpeg are missing; and the job store and rate limiter are in-memory, so a second replica
+would not see jobs started on the first.
+
+Three things that will bite you:
+
+- **`SITE_URL` needs the scheme.** Railway's dashboard shows the domain as a bare hostname. Paste
+  that verbatim and older builds crashed on `new URL()`, taking down `metadataBase`, `sitemap.xml`
+  and `robots.txt` — every route 502s. `src/lib/env.ts` now assumes `https://` when the scheme is
+  missing, but set it in full anyway.
+- **`PORT` must line up with `EXPOSE`.** Railway injects its own `PORT` (8080 in our case) while the
+  image declares `EXPOSE 3000`, so the edge proxy targets 3000 and the app listens on 8080 — a 502
+  with a perfectly healthy container in the logs. Set `PORT=3000` explicitly.
+- **Build-time vs runtime.** `SITE_URL`, `BRAND_NAME` and every `NEXT_PUBLIC_*` are resolved while
+  building, so changing them requires a redeploy, not just a restart. `CDN_PROXY_URL`,
+  `DOWNLOAD_SIGNING_SECRET` and the limits are read at request time and only need a restart.
+
+For GitHub auto-deploy on a **private** repo, the Railway GitHub App needs explicit access to it
+(GitHub → Settings → Applications → Railway → Repository access). Without that the webhook never
+fires and pushes silently do nothing.
+
 ## Advertising slots (Adsterra)
 
 `src/components/AdSlot.tsx` renders fixed-height containers — `AdSlotTop`,
