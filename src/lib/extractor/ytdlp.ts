@@ -248,6 +248,21 @@ async function resolveDirectLinks(formats: BuiltFormat[]): Promise<FormatOption[
   return results.filter((f): f is FormatOption => f !== null);
 }
 
+/**
+ * Users get a friendly, non-revealing message; operators need the real thing.
+ * Without this, a production failure looks identical whether yt-dlp is missing,
+ * the platform changed its API, or the box lost DNS — all of them surface as
+ * "extraction_error" and nothing reaches the logs.
+ */
+function logYtDlpFailure(context: string, stderr: string): void {
+  const text = (stderr || "").trim();
+  if (!text) {
+    console.error(`[yt-dlp] ${context}: failed with no stderr`);
+    return;
+  }
+  console.error(`[yt-dlp] ${context}: ${text.split("\n").slice(-6).join(" | ").slice(0, 1200)}`);
+}
+
 function mapYtDlpError(stderr: string): ExtractError {
   const lower = stderr.toLowerCase();
   if (lower.includes("private video") || lower.includes("login required")) {
@@ -290,9 +305,17 @@ async function runYtDlpJson(url: string): Promise<string> {
       );
       return result.stdout;
     } catch (err: unknown) {
-      const e = err as { stderr?: string; killed?: boolean };
+      const e = err as { stderr?: string; killed?: boolean; code?: string; message?: string };
       if (e.killed) throw new ExtractError("extraction_error", "The source took too long to respond.");
 
+      // ENOENT here means the binary itself is missing, which no retry fixes
+      // and which looks exactly like a source failure from the outside.
+      if (e.code === "ENOENT") {
+        console.error(`[yt-dlp] binary not found at "${env.ytDlpPath}" — is it installed on PATH?`);
+        throw new ExtractError("server_error", "The downloader is misconfigured. Please try later.");
+      }
+
+      logYtDlpFailure(`extract attempt ${attempt}/${MAX_ATTEMPTS}`, e.stderr ?? e.message ?? "");
       const mapped = mapYtDlpError(e.stderr ?? "");
       // Only retry the generic/unclassified failure — platforms like Instagram
       // intermittently throttle anonymous requests, and a short retry often succeeds.
@@ -405,6 +428,7 @@ export function downloadFormat(
     child.on("close", (code) => {
       clearTimeout(timer);
       if (code !== 0) {
+        logYtDlpFailure(`download exited ${code}`, stderrBuf);
         fs.rmSync(jobDir, { recursive: true, force: true });
         reject(mapYtDlpError(stderrBuf));
         return;
